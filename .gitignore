@@ -1,0 +1,35 @@
+# Конфигурация с ключами
+.env
+
+# Виртуальное окружение
+venv/
+env/
+ENV/
+
+# Сессионные файлы
+*.session
+*.session-journal
+temp_session.session
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log
+
+# Временные файлы
+*.tmp
