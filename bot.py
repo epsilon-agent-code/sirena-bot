@@ -11,13 +11,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # === ЛОГИРОВАНИЕ ===
-print("🔍 Проверка переменных окружения...", file=sys.stderr)
-print(f"API_ID: {os.getenv('API_ID')}", file=sys.stderr)
-print(f"API_HASH: {os.getenv('API_HASH')[:10]}...", file=sys.stderr)
-print(f"STRING_SESSION: {len(os.getenv('STRING_SESSION', ''))} символов", file=sys.stderr)
-print(f"DASHSCOPE_API_KEY: {os.getenv('DASHSCOPE_API_KEY', '')[:15]}...", file=sys.stderr)
+api_id = os.getenv('API_ID')
+api_hash = os.getenv('API_HASH')
+string_session = os.getenv('STRING_SESSION')
+dashscope_key = os.getenv('DASHSCOPE_API_KEY')
 
-if not all([os.getenv('API_ID'), os.getenv('API_HASH'), os.getenv('STRING_SESSION'), os.getenv('DASHSCOPE_API_KEY')]):
+print(f"API_ID: {api_id or 'NOT SET'}", file=sys.stderr)
+print(f"API_HASH: {api_hash[:10] + '...' if api_hash else 'NOT SET'}", file=sys.stderr)
+print(f"STRING_SESSION: {len(string_session) if string_session else 0} chars", file=sys.stderr)
+print(f"DASHSCOPE: {dashscope_key[:15] + '...' if dashscope_key else 'NOT SET'}", file=sys.stderr)
+
+if not all([api_id, api_hash, string_session, dashscope_key]):
     print("❌ ОШИБКА: Не все переменные окружения установлены!", file=sys.stderr)
     sys.exit(1)
 
