@@ -1,11 +1,4 @@
----
-title: Сирена - ИИ-автоответчик для Telegram
-emoji: 🌊
-colorFrom: purple
-colorTo: blue
-sdk: docker
-pinned: false
----
+
 #  Сирена — ИИ-автоответчик для Telegram
 
 **Сирена** — это умный ИИ-помощник, который отвечает за тебя в Telegram, когда ты занят. Работает на базе Qwen моделей через Alibaba DashScope API.
