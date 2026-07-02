@@ -136,7 +136,7 @@ async def track_owner_activity(client, message):
 @app.on_message(filters.me & filters.command(["away", "back", "help", "night", "status", "unmute", "mutes"]))
 async def commands_handler(client, message):
     global is_away, current_status, NIGHT_START_HOUR, NIGHT_END_HOUR
-    
+    print(f"📍 Команда от: chat_id={message.chat.id}, chat_type={message.chat.type}", file=sys.stderr)
     # Проверяем что это Saved Messages
     if message.chat.id != SAVED_MESSAGES_ID:
         return
