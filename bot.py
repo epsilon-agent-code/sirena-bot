@@ -133,13 +133,24 @@ async def track_owner_activity(client, message):
     last_owner_activity = time.time()
 
 # === КОМАНДЫ ТОЛЬКО В ИЗБРАННОМ ===
-@app.on_message(filters.me & filters.command(["away", "back", "help", "night", "status", "unmute", "mutes"]))
+# === КОМАНДЫ ТОЛЬКО В ИЗБРАННОМ ===
+@app.on_message(filters.command(["away", "back", "help", "night", "status", "unmute", "mutes"]))
 async def commands_handler(client, message):
     global is_away, current_status, NIGHT_START_HOUR, NIGHT_END_HOUR
-    print(f"📍 Команда от: chat_id={message.chat.id}, chat_type={message.chat.type}", file=sys.stderr)
+    
+    # ЛОГИРОВАНИЕ - увидим что происходит
+    print(f"📍 КОМАНДА ПОЛУЧЕНА!", file=sys.stderr)
+    print(f"   Chat ID: {message.chat.id}", file=sys.stderr)
+    print(f"   Chat Type: {message.chat.type}", file=sys.stderr)
+    print(f"   From Me: {message.from_user.is_self}", file=sys.stderr)
+    print(f"   Command: {message.command}", file=sys.stderr)
+    
     # Проверяем что это Saved Messages
     if message.chat.id != SAVED_MESSAGES_ID:
+        print(f"   ❌ НЕ Saved Messages! ID: {message.chat.id} (ожидался {SAVED_MESSAGES_ID})", file=sys.stderr)
         return
+    
+    print(f"   ✅ Это Saved Messages, обрабатываю...", file=sys.stderr)
     
     cmd = message.command[0]
     
@@ -232,8 +243,7 @@ async def commands_handler(client, message):
                 text += f"• ID {uid}: ещё {mins_left} мин\n"
             await message.edit_text(text)
         else:
-            await message.edit_text("✅ Никто не замьючен")
-
+            await message.edit_text("✅ Никто не замьючен")                                 
 # === АВТООТВЕТЧИК ===
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
 async def auto_responder(client, message):
