@@ -7,7 +7,7 @@ import sys
 from pyrogram import Client, filters
 from openai import OpenAI
 from dotenv import load_dotenv
-
+from datetime import datetime, timezone, timedelta
 load_dotenv()
 
 # === ЛОГИРОВАНИЕ ===
@@ -48,7 +48,9 @@ except Exception as e:
 
 is_away = False
 current_status = "занят"
-
+NIGHT_START_HOUR = 23  # Начало ночи
+NIGHT_END_HOUR = 7     # Конец ночи
+MOSCOW_TZ = timezone(timedelta(hours=3))  # МСК
 # === ИИ-СУДЬЯ ===
 user_mutes = {}  # {user_id: timestamp_окончания_мута}
 # Время последнего ответа Сирены каждому пользователю
@@ -123,8 +125,30 @@ async def control_bot(client, message):
     else:
         is_away = False
         await message.reply_text("❌ Режим выключен. Я снова в сети.")
-
+@app.on_message(filters.command(["night"], prefixes="/") & filters.me)
+async def set_night_hours(client, message):
+    global NIGHT_START_HOUR, NIGHT_END_HOUR
+    
+    if len(message.command) >= 3:
+        try:
+            NIGHT_START_HOUR = int(message.command[1])
+            NIGHT_END_HOUR = int(message.command[2])
+            await message.reply_text(f"✅ Ночные часы: {NIGHT_START_HOUR}:00 - {NIGHT_END_HOUR}:00")
+        except ValueError:
+            await message.reply_text("❌ Используй числа. Пример: /night 23 7")
+    else:
+        await message.reply_text(f"Текущие часы: {NIGHT_START_HOUR}:00 - {NIGHT_END_HOUR}:00\nИспользуй: /night 23 7")
 # === АВТООТВЕТЧИК ===
+def is_night_time():
+    """Проверяет текущее время - ночь ли сейчас"""
+    now = datetime.now(MOSCOW_TZ)
+    hour = now.hour
+
+    if NIGHT_START_HOUR > NIGHT_END_HOUR:
+        return hour >= NIGHT_START_HOUR or hour < NIGHT_END_HOUR
+    else:
+        return NIGHT_START_HOUR <= hour < NIGHT_END_HOUR
+
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
 async def auto_responder(client, message):
     global is_away, current_status
@@ -164,9 +188,31 @@ async def auto_responder(client, message):
     now = time.time()
     last_time = last_siren_response.get(user_id, 0)
     time_diff = now - last_time
-    
-    if last_time == 0:
-        # ПРОМПТ 1: Первое сообщение
+
+    # ПРОВЕРКА: НОЧНОЙ РЕЖИМ
+    if is_night_time():
+        system_prompt = f"""Ты — Сирена, ИИ-помощница моего хозяина.
+
+СЕЙЧАС НОЧЬ. Хозяин СПИТ.
+
+ПРАВИЛА:
+1. ОБЯЗАТЕЛЬНО представься: "Привет, я Сирена" (только в первом сообщении)
+2. Скажи что хозяин сейчас спит
+3. Скажи что он ответит утром / когда проснётся
+4. Если собеседник задал вопрос — скажи что передашь хозяину утром
+5. Если собеседник прощается — попрощайся кратко
+6. НЕ используй эмодзи
+7. Отвечай кратко (1-3 предложения)
+8. НИКОГДА не называй имя хозяина
+9. Говори от СВОЕГО имени, не от имени хозяина
+
+История переписки:
+{history[:8] if history else "Это первое сообщение"}
+
+Новое сообщение: {text}"""
+
+    elif last_time == 0:
+        # ПРОМПТ 1: Первое сообщение (день)
         system_prompt = f"""Ты — Сирена, ИИ-помощник. Это ПЕРВОЕ сообщение от этого человека.
 
 Твой хозяин сейчас {current_status}.
@@ -175,7 +221,7 @@ async def auto_responder(client, message):
 После этого можешь добавить короткое предложение помощи.
 НЕ используй эмодзи. Отвечай кратко.
 ВАЖНО: НИКОГДА не называй имя хозяина. Если спросят — отвечай "Я не раскрываю личные данные"."""
-    
+
     elif time_diff < 300:  # 5 минут = 300 секунд
         # ПРОМПТ 2: Диалог идёт, поддерживаем и можем завершить
         system_prompt = f"""Ты — Сирена. Диалог УЖЕ идёт (ты отвечала менее 5 минут назад).
@@ -197,7 +243,7 @@ async def auto_responder(client, message):
 7. НЕ называй имя хозяина
 8. НЕ используй эмодзи
 9. Отвечай кратко (1-2 предложения)"""
-    
+
     else:
         # ПРОМПТ 3: Прошло больше 5 минут, напоминаем о статусе
         system_prompt = f"""Ты — Сирена. Прошло больше 5 минут с твоего последнего ответа.
@@ -217,7 +263,7 @@ async def auto_responder(client, message):
 5. НЕ называй имя хозяина
 6. НЕ используй эмодзи
 7. Отвечай кратко"""
-    
+
     try:
         response = ai_client.chat.completions.create(
             model="qwen-plus",
@@ -229,10 +275,10 @@ async def auto_responder(client, message):
         )
         answer = response.choices[0].message.content
         await message.reply_text(answer)
-        
+
         # Запоминаем время ответа
         last_siren_response[user_id] = time.time()
-        
+
     except Exception as e:
         print(f"Ошибка API: {e}")
         await message.reply_text(f"Привет, это Сирена. Мой хозяин сейчас {current_status}, ответит позже.")
@@ -266,6 +312,7 @@ async def admin_commands(client, message):
             await message.reply_text(text)
         else:
             await message.reply_text("✅ Никто не замьючен")
+
 # === ЗАПУСК ===
 if __name__ == "__main__":
     print("🚀 Сирена запущена с ИИ-судьёй!", flush=True)
