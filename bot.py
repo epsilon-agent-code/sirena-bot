@@ -133,8 +133,7 @@ async def track_owner_activity(client, message):
     last_owner_activity = time.time()
 
 # === КОМАНДЫ ТОЛЬКО В ИЗБРАННОМ ===
-# === КОМАНДЫ ТОЛЬКО В ИЗБРАННОМ ===
-@app.on_message(filters.command(["away", "back", "help", "night", "status", "unmute", "mutes"]))
+@app.on_message(filters.command(["away", "back", "help", "night", "status", "unmute", "mutes"], prefixes="/"))
 async def commands_handler(client, message):
     global is_away, current_status, NIGHT_START_HOUR, NIGHT_END_HOUR
     
