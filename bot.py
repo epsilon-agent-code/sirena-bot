@@ -133,23 +133,16 @@ async def track_owner_activity(client, message):
     last_owner_activity = time.time()
 
 # === КОМАНДЫ ТОЛЬКО В ИЗБРАННОМ ===
-@app.on_message(filters.command(["away", "back", "help", "night", "status", "unmute", "mutes"], prefixes="/"))
+# === КОМАНДЫ ===
+@app.on_message(filters.command(["away", "back", "help", "night", "status", "unmute", "mutes"], prefixes="/") & filters.me)
 async def commands_handler(client, message):
     global is_away, current_status, NIGHT_START_HOUR, NIGHT_END_HOUR
     
-    # ЛОГИРОВАНИЕ - увидим что происходит
-    print(f"📍 КОМАНДА ПОЛУЧЕНА!", file=sys.stderr)
-    print(f"   Chat ID: {message.chat.id}", file=sys.stderr)
-    print(f"   Chat Type: {message.chat.type}", file=sys.stderr)
-    print(f"   From Me: {message.from_user.is_self}", file=sys.stderr)
-    print(f"   Command: {message.command}", file=sys.stderr)
-    
-    # Проверяем что это Saved Messages
-    if message.chat.id != SAVED_MESSAGES_ID:
-        print(f"   ❌ НЕ Saved Messages! ID: {message.chat.id} (ожидался {SAVED_MESSAGES_ID})", file=sys.stderr)
+    # Проверяем что это Saved Messages (private чат с самим собой)
+    if message.chat.type != "private":
         return
     
-    print(f"   ✅ Это Saved Messages, обрабатываю...", file=sys.stderr)
+    print(f"📍 КОМАНДА: {message.command[0]}", file=sys.stderr)
     
     cmd = message.command[0]
     
@@ -170,42 +163,29 @@ async def commands_handler(client, message):
         help_text = (
             "--- КОМАНДЫ СИРЕНЫ ---\n\n"
             "/away [статус] — включить автоответчик\n"
-            "  Пример: /away на встрече\n"
-            "  Пример: /away сплю\n\n"
+            "  Пример: /away на встрече\n\n"
             "/back — выключить автоответчик\n\n"
             "/help — этот список\n\n"
             "/night [старт] [конец] — часы ночи\n"
-            "  Пример: /night 23 7\n"
-            "  Сейчас: " + str(NIGHT_START_HOUR) + ":00 - " + str(NIGHT_END_HOUR) + ":00\n\n"
+            "  Пример: /night 23 7\n\n"
             "/status — текущий статус\n\n"
             "/unmute [user_id] — размутить\n"
-            "/mutes — список замьюченных\n\n"
-            "--- ЛОГИКА ---\n\n"
-            "1. Команды работают ТОЛЬКО в избранном\n"
-            "2. Если ты онлайн — Сирена молчит\n"
-            "3. После твоего выхода ждёт 5 минут\n"
-            "4. Антиспам: не отвечает чаще 1 раза в минуту\n"
-            "5. ИИ-судья мутит спамеров и агрессоров\n"
-            "6. Ночью ИИ говорит что хозяин спит\n"
-            "7. Отвечает только в ЛС, группы игнорирует"
+            "/mutes — список замьюченных"
         )
         await message.edit_text(help_text)
     
     elif cmd == "status":
         now = datetime.now(MOSCOW_TZ)
         time_since_active = int(time.time() - last_owner_activity) if last_owner_activity > 0 else 999999
-        owner_active = time_since_active < WAIT_AFTER_OWNER_ACTIVE
         
         status_text = (
-            f"--- СТАТУС СИРЕНЫ ---\n\n"
+            f"--- СТАТУС ---\n\n"
             f"Автоответчик: {'ВКЛ' if is_away else 'ВЫКЛ'}\n"
-            f"Статус хозяина: {current_status}\n"
-            f"Время (МСК): {now.strftime('%H:%M')}\n"
-            f"Ночной режим: {'АКТИВЕН' if is_night_time() else 'нет'}\n"
-            f"Часы ночи: {NIGHT_START_HOUR}:00 - {NIGHT_END_HOUR}:00\n"
-            f"Хозяин активен: {'ДА' if owner_active else 'нет'}\n"
-            f"Последняя активность: {time_since_active} сек назад\n"
-            f"Замьючено: {len(user_mutes)} чел."
+            f"Статус: {current_status}\n"
+            f"Время: {now.strftime('%H:%M')} МСК\n"
+            f"Ночь: {'ДА' if is_night_time() else 'нет'}\n"
+            f"Часы: {NIGHT_START_HOUR}:00 - {NIGHT_END_HOUR}:00\n"
+            f"Последняя активность: {time_since_active} сек назад"
         )
         await message.edit_text(status_text)
     
@@ -214,11 +194,11 @@ async def commands_handler(client, message):
             try:
                 NIGHT_START_HOUR = int(message.command[1])
                 NIGHT_END_HOUR = int(message.command[2])
-                await message.edit_text(f"✅ Ночные часы: {NIGHT_START_HOUR}:00 - {NIGHT_END_HOUR}:00")
-            except ValueError:
-                await message.edit_text("❌ Используй числа. Пример: /night 23 7")
+                await message.edit_text(f"✅ Ночь: {NIGHT_START_HOUR}:00 - {NIGHT_END_HOUR}:00")
+            except:
+                await message.edit_text("❌ Пример: /night 23 7")
         else:
-            await message.edit_text(f"Текущие часы: {NIGHT_START_HOUR}:00 - {NIGHT_END_HOUR}:00\nИспользуй: /night 23 7")
+            await message.edit_text(f"Текущие: {NIGHT_START_HOUR}:00 - {NIGHT_END_HOUR}:00")
     
     elif cmd == "unmute":
         if len(message.command) > 1:
@@ -226,23 +206,23 @@ async def commands_handler(client, message):
                 user_id = int(message.command[1])
                 if user_id in user_mutes:
                     del user_mutes[user_id]
-                    await message.edit_text(f"✅ Пользователь {user_id} разблокирован")
+                    await message.edit_text(f"✅ {user_id} разблокирован")
                 else:
-                    await message.edit_text("❌ Пользователь не в муте")
+                    await message.edit_text("❌ Не в муте")
             except:
                 await message.edit_text("❌ Неверный ID")
         else:
-            await message.edit_text("Используй: /unmute [user_id]")
+            await message.edit_text("/unmute [user_id]")
     
     elif cmd == "mutes":
         if user_mutes:
-            text = "📊 Замьюченные:\n"
-            for uid, expiry in user_mutes.items():
-                mins_left = int((expiry - time.time()) / 60)
-                text += f"• ID {uid}: ещё {mins_left} мин\n"
+            text = "📊 Муты:\n"
+            for uid, exp in user_mutes.items():
+                mins = int((exp - time.time()) / 60)
+                text += f"• {uid}: {mins} мин\n"
             await message.edit_text(text)
         else:
-            await message.edit_text("✅ Никто не замьючен")                                 
+            await message.edit_text("✅ Чисто")                           
 # === АВТООТВЕТЧИК ===
 @app.on_message(filters.private & ~filters.me & ~filters.bot)
 async def auto_responder(client, message):
