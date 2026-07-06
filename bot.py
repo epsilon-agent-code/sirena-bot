@@ -48,6 +48,8 @@ except Exception as e:
 
 is_away = False
 current_status = "занят"
+last_owner_activity = 0  # Время последней активности хозяина
+WAIT_AFTER_OWNER_ACTIVE = 300  # 5 минут (300 секунд)
 NIGHT_START_HOUR = 23  # Начало ночи
 NIGHT_END_HOUR = 7     # Конец ночи
 MOSCOW_TZ = timezone(timedelta(hours=3))  # МСК
@@ -125,6 +127,20 @@ async def control_bot(client, message):
     else:
         is_away = False
         await message.reply_text("❌ Режим выключен. Я снова в сети.")
+@app.on_message(filters.command(["status"], prefixes="/") & filters.me)
+async def show_status(client, message):
+    time_since_active = int(time.time() - last_owner_activity) if last_owner_activity > 0 else 999999
+    owner_active = time_since_active < WAIT_AFTER_OWNER_ACTIVE
+    
+    status_text = (
+        f"--- СТАТУС СИРЕНЫ ---\n\n"
+        f"Автоответчик: {'ВКЛ ✅' if is_away else 'ВЫКЛ ❌'}\n"
+        f"Статус хозяина: {current_status}\n"
+        f"Хозяин активен: {'ДА 🟢' if owner_active else 'НЕТ 🔴'}\n"
+        f"Последняя активность: {time_since_active} сек назад\n"
+        f"Замьючено: {len(user_mutes)} чел."
+    )
+    await message.reply_text(status_text)
 @app.on_message(filters.command(["night"], prefixes="/") & filters.me)
 async def set_night_hours(client, message):
     global NIGHT_START_HOUR, NIGHT_END_HOUR
@@ -138,6 +154,12 @@ async def set_night_hours(client, message):
             await message.reply_text("❌ Используй числа. Пример: /night 23 7")
     else:
         await message.reply_text(f"Текущие часы: {NIGHT_START_HOUR}:00 - {NIGHT_END_HOUR}:00\nИспользуй: /night 23 7")
+        # === ОТСЛЕЖИВАНИЕ АКТИВНОСТИ ХОЗЯИНА ===
+@app.on_message(filters.me & ~filters.service)
+async def track_owner_activity(client, message):
+    global last_owner_activity
+    last_owner_activity = time.time()
+    print(f"👤 Хозяин активен! Время: {time.strftime('%H:%M:%S')}", file=sys.stderr)
 # === АВТООТВЕТЧИК ===
 def is_night_time():
     """Проверяет текущее время - ночь ли сейчас"""
@@ -153,7 +175,13 @@ def is_night_time():
 async def auto_responder(client, message):
     global is_away, current_status
     
+    # Проверка: автоответчик включён?
     if not is_away or not message.text:
+        return
+    
+    # Проверка: хозяин был активен менее 5 минут назад
+    if last_owner_activity > 0 and (time.time() - last_owner_activity) < WAIT_AFTER_OWNER_ACTIVE:
+        print(f"⏳ Хозяин недавно был онлайн, молчу", file=sys.stderr)
         return
     
     user_id = message.from_user.id
